@@ -1,4 +1,4 @@
-#include <cstdio>
+#include <cstdint>
 #include <cstdlib>
 #include <raylib.h>
 #include <raymath.h>
@@ -16,8 +16,12 @@
 #define FPS 30
 
 //-------------[Grid]-------------//
-#define CELL_COUNT 100
+#define CELL_COUNT 50
 #define CELL_SIZE WINDOW_WIDTH / CELL_COUNT
+
+//-------------[Entities]-------------//
+#define ENEMY_COLS 5
+#define ENEMY_SPACING 5
 
 namespace grid {
 void draw_cell(int x, int y, Color color = WHITE) {
@@ -25,40 +29,56 @@ void draw_cell(int x, int y, Color color = WHITE) {
 }
 } // namespace grid
 
-void init_game() {
-  InitWindow(WINDOW_WIDTH, WINDOW_HEIGHT, WINDOW_TITLE);
-
-  if (!IsWindowReady()) {
-    exit(EXIT_FAILURE);
-  }
-
-  HideCursor();
-
-  SetTargetFPS(FPS);
-}
-
-void close_game() {}
-
-int player_shape[3][3] = {
+uint8_t player_shape[3][3] = {
     {0, 0, 0},
     {0, 1, 0},
     {1, 1, 1},
 };
 
-int projectile_shape[3][3] = {
-    {0, 0, 0},
+uint8_t projectile_shape[3][3] = {
+    {0, 1, 0},
     {0, 1, 0},
     {0, 0, 0},
 };
 
-// Initial position
+// Enemy Shapes
+
+uint8_t alpha_enemy_shape[3][3] = {
+    {1, 1, 1},
+    {0, 1, 0},
+    {1, 1, 1},
+};
+uint8_t beta_enemy_shape[3][3] = {
+    {0, 1, 0},
+    {1, 1, 1},
+    {0, 1, 0},
+};
+
+uint8_t zeta_enemy_shape[3][3] = {
+    {1, 0, 1},
+    {0, 1, 0},
+    {1, 0, 1},
+};
+
+// Initial positions
 Vector2 player_pos = {(float)CELL_COUNT / 2, CELL_COUNT - 5};
 
-Vector2 projectile_pos = {player_pos.x, player_pos.y};
+Vector2 projectile_pos = {player_pos.x, player_pos.y + 1};
+
+Vector2 alpha_enemies_pos[ENEMY_COLS];
+Vector2 beta_enemies_pos[ENEMY_COLS];
+Vector2 zeta_enemies_pos[ENEMY_COLS];
+
+void init_enemies_pos(Vector2 *pos_arr, float y) {
+  Vector2 base_pos = {3, y};
+  for (uint8_t i = 0; i < ENEMY_COLS; i++) {
+    pos_arr[i] = Vector2Add(base_pos, {(float)(i * ENEMY_SPACING), 0});
+  }
+}
 
 bool player_is_shooting = false;
 
-void draw_shape(Vector2 pos, int shape[3][3]) {
+void draw_shape(Vector2 pos, uint8_t shape[3][3]) {
   for (int i = 0; i < 3; i++) {
     for (int j = 0; j < 3; j++) {
       int cell = shape[i][j];
@@ -70,19 +90,53 @@ void draw_shape(Vector2 pos, int shape[3][3]) {
   }
 }
 
+enum EnemyType {
+  ALPHA,
+  BETA,
+  ZETA,
+};
+
 void draw_player() { draw_shape(player_pos, player_shape); }
 void draw_projectile() { draw_shape(projectile_pos, projectile_shape); }
+
+// Terrible code
+void draw_enemies(Vector2 *positions, EnemyType type) {
+  for (uint8_t i = 0; i < ENEMY_COLS; i++) {
+    switch (type) {
+    case ALPHA:
+      draw_shape(positions[i], alpha_enemy_shape);
+      break;
+    case BETA:
+      draw_shape(positions[i], beta_enemy_shape);
+      break;
+    case ZETA:
+      draw_shape(positions[i], zeta_enemy_shape);
+      break;
+    }
+  }
+}
 
 void render() {
   // Player
   draw_player();
   draw_projectile();
+
+  // Enemies
+  draw_enemies(alpha_enemies_pos, ALPHA);
+  draw_enemies(beta_enemies_pos, BETA);
+  draw_enemies(zeta_enemies_pos, ZETA);
 }
 
 void update_pos() {
   // Projectile
   if (player_is_shooting) {
     projectile_pos = Vector2Add(projectile_pos, {0, -1});
+  }
+}
+
+// How to handle this shit?
+void check_enemy_collision() {
+  for (int i = 0; i < 5; i++) {
   }
 }
 
@@ -135,6 +189,25 @@ void game_loop() {
     EndDrawing();
   }
 }
+
+void init_game() {
+  InitWindow(WINDOW_WIDTH, WINDOW_HEIGHT, WINDOW_TITLE);
+
+  if (!IsWindowReady()) {
+    exit(EXIT_FAILURE);
+  }
+
+  HideCursor();
+
+  SetTargetFPS(FPS);
+
+  // Game Setup
+  init_enemies_pos(alpha_enemies_pos, 3);
+  init_enemies_pos(beta_enemies_pos, 8);
+  init_enemies_pos(zeta_enemies_pos, 13);
+}
+
+void close_game() {}
 
 int main(int argc, char *argv[]) {
   init_game();

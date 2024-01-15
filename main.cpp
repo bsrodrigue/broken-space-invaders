@@ -6,7 +6,6 @@
 //-------------[Broken Space Invaders]----------------------------//
 
 //-------------[Window]-------------//
-
 #define WINDOW_WIDTH 600
 #define WINDOW_HEIGHT 600
 
@@ -18,6 +17,8 @@
 //-------------[Grid]-------------//
 #define CELL_COUNT 50
 #define CELL_SIZE WINDOW_WIDTH / CELL_COUNT
+
+#define GET_INGAME_POS(ABS_POS) ABS_POS *CELL_SIZE
 
 //-------------[Entities]-------------//
 #define ENEMY_COLS 5
@@ -36,18 +37,18 @@ uint8_t player_shape[3][3] = {
 };
 
 uint8_t projectile_shape[3][3] = {
-    {0, 1, 0},
-    {0, 1, 0},
     {0, 0, 0},
+    {0, 1, 0},
+    {0, 1, 0},
 };
 
 // Enemy Shapes
-
 uint8_t alpha_enemy_shape[3][3] = {
     {1, 1, 1},
     {0, 1, 0},
     {1, 1, 1},
 };
+
 uint8_t beta_enemy_shape[3][3] = {
     {0, 1, 0},
     {1, 1, 1},
@@ -64,10 +65,6 @@ uint8_t zeta_enemy_shape[3][3] = {
 Vector2 player_pos = {(float)CELL_COUNT / 2, CELL_COUNT - 5};
 
 Vector2 projectile_pos = {player_pos.x, player_pos.y + 1};
-
-Vector2 alpha_enemies_pos[ENEMY_COLS];
-Vector2 beta_enemies_pos[ENEMY_COLS];
-Vector2 zeta_enemies_pos[ENEMY_COLS];
 
 void init_enemies_pos(Vector2 *pos_arr, float y) {
   Vector2 base_pos = {3, y};
@@ -116,15 +113,55 @@ void draw_enemies(Vector2 *positions, EnemyType type) {
   }
 }
 
+Rectangle get_rect_from_enemy(Vector2 pos) {
+  Rectangle rect;
+  rect.x = GET_INGAME_POS(pos.x);
+  rect.y = GET_INGAME_POS(pos.y);
+
+  rect.width = ((float)CELL_SIZE * 3);
+  rect.height = rect.width;
+
+  return rect;
+}
+
+Rectangle get_rect_from_projectile(Vector2 pos) {
+  Rectangle rect;
+  rect.x = GET_INGAME_POS((pos.x + 1));
+  rect.y = GET_INGAME_POS((pos.y + 1));
+
+  rect.width = ((float)CELL_SIZE);
+  rect.height = ((float)CELL_SIZE * 2);
+  return rect;
+}
+
+void draw_collision_box(Rectangle rect) { DrawRectangleRec(rect, RED); }
+
+void draw_collision_boxes() {
+  Rectangle enemy_rect = get_rect_from_enemy({3, 3});
+  Rectangle projectile_rect = get_rect_from_projectile(projectile_pos);
+  draw_collision_box(enemy_rect);
+  draw_collision_box(projectile_rect);
+}
+
+// How to handle this shit?
+bool check_enemy_collision(Vector2 enemy_pos, Vector2 projectile_pos) {
+  Rectangle enemy_rect = get_rect_from_enemy(enemy_pos);
+  Rectangle projectile_rect = get_rect_from_projectile(projectile_pos);
+
+  return CheckCollisionRecs(enemy_rect, projectile_rect);
+}
+
+void kill_enemy() {}
+
 void render() {
   // Player
   draw_player();
+  // DEBUG: Collision Boxes
+  draw_collision_boxes();
   draw_projectile();
 
   // Enemies
-  draw_enemies(alpha_enemies_pos, ALPHA);
-  draw_enemies(beta_enemies_pos, BETA);
-  draw_enemies(zeta_enemies_pos, ZETA);
+  draw_shape({3, 3}, alpha_enemy_shape);
 }
 
 void update_pos() {
@@ -132,11 +169,10 @@ void update_pos() {
   if (player_is_shooting) {
     projectile_pos = Vector2Add(projectile_pos, {0, -1});
   }
-}
 
-// How to handle this shit?
-void check_enemy_collision() {
-  for (int i = 0; i < 5; i++) {
+  // Collisions
+  if (check_enemy_collision({3, 3}, projectile_pos)) {
+    TraceLog(LOG_INFO, "Enemy Hit");
   }
 }
 
@@ -202,9 +238,6 @@ void init_game() {
   SetTargetFPS(FPS);
 
   // Game Setup
-  init_enemies_pos(alpha_enemies_pos, 3);
-  init_enemies_pos(beta_enemies_pos, 8);
-  init_enemies_pos(zeta_enemies_pos, 13);
 }
 
 void close_game() {}

@@ -1,4 +1,5 @@
 #include <cstdint>
+#include <cstdio>
 #include <cstdlib>
 #include <raylib.h>
 #include <raymath.h>
@@ -111,14 +112,8 @@ void draw_projectile() { draw_shape(projectile_pos, projectile_shape); }
 
 // Terrible code
 void draw_enemies() {
-  for (uint8_t i = 0; i < 5; i++) {
+  for (uint8_t i = 0; i < enemies_pos.size(); i++) {
     draw_shape(enemies_pos[i], alpha_enemy_shape);
-  }
-  for (uint8_t i = 5; i < 10; i++) {
-    draw_shape(enemies_pos[i], beta_enemy_shape);
-  }
-  for (uint8_t i = 10; i < 15; i++) {
-    draw_shape(enemies_pos[i], zeta_enemy_shape);
   }
 }
 
@@ -150,7 +145,7 @@ void draw_collision_boxes() {
   Rectangle projectile_rect = get_rect_from_projectile(projectile_pos);
   draw_collision_box(projectile_rect);
 
-  for (uint8_t i = 0; i < 15; i++) {
+  for (uint8_t i = 0; i < enemies_pos.size(); i++) {
     Rectangle enemy_rect = get_rect_from_enemy(enemies_pos[i]);
     draw_collision_box(enemy_rect);
   }
@@ -180,7 +175,7 @@ void render() {
   // Player
   draw_player();
   // DEBUG: Collision Boxes
-  draw_collision_boxes();
+  // draw_collision_boxes();
   draw_projectile();
 
   // Enemies
@@ -188,10 +183,10 @@ void render() {
 }
 
 void handle_enemy_hit() {
-  for (uint8_t i = 0; i < 15; i++) {
+  for (uint8_t i = 0; i < enemies_pos.size(); i++) {
     if (check_enemy_collision(enemies_pos[i], projectile_pos)) {
       // DEBUG: Enemy - Projectile Collision
-      TraceLog(LOG_INFO, "Enemy Hit");
+      TraceLog(LOG_INFO, "Enemy %d Hit", i);
 
       kill_enemy(i);
       reset_projectile(player_pos, &projectile_pos);
@@ -240,7 +235,7 @@ double last_update_time = 0;
 bool can_update_pos() {
   double current_time = GetTime();
 
-  if (current_time - last_update_time >= 0.1) {
+  if (current_time - last_update_time >= 0.03) {
     last_update_time = current_time;
     return true;
   }

@@ -61,6 +61,13 @@ uint8_t zeta_enemy_shape[3][3] = {
     {1, 0, 1},
 };
 
+// Enemy Placement
+uint8_t enemy_placement[3][5] = {
+    {1, 1, 1, 1, 1},
+    {2, 2, 2, 2, 2},
+    {3, 3, 3, 3, 3},
+};
+
 // Initial positions
 Vector2 player_pos = {(float)CELL_COUNT / 2, CELL_COUNT - 5};
 
@@ -131,6 +138,7 @@ Rectangle get_rect_from_projectile(Vector2 pos) {
 
   rect.width = ((float)CELL_SIZE);
   rect.height = ((float)CELL_SIZE * 2);
+
   return rect;
 }
 
@@ -153,6 +161,15 @@ bool check_enemy_collision(Vector2 enemy_pos, Vector2 projectile_pos) {
 
 void kill_enemy() {}
 
+void reset_projectile(Vector2 player_pos, Vector2 *projectile_pos) {
+  projectile_pos->x = player_pos.x;
+  projectile_pos->y = player_pos.y;
+
+  player_is_shooting = false;
+}
+
+bool check_out_of_bounds(Vector2 pos) { return false; }
+
 void render() {
   // Player
   draw_player();
@@ -172,7 +189,15 @@ void update_pos() {
 
   // Collisions
   if (check_enemy_collision({3, 3}, projectile_pos)) {
+    // DEBUG: Enemy - Projectile Collision
     TraceLog(LOG_INFO, "Enemy Hit");
+
+    reset_projectile(player_pos, &projectile_pos);
+  }
+
+  // Out of Bounds
+  if (projectile_pos.y <= -2) {
+    reset_projectile(player_pos, &projectile_pos);
   }
 }
 

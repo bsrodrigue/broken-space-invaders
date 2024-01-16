@@ -2,6 +2,7 @@
 #include <cstdlib>
 #include <raylib.h>
 #include <raymath.h>
+#include <vector>
 
 //-------------[Broken Space Invaders]----------------------------//
 
@@ -70,13 +71,18 @@ uint8_t enemy_placement[3][5] = {
 
 // Initial positions
 Vector2 player_pos = {(float)CELL_COUNT / 2, CELL_COUNT - 5};
-
 Vector2 projectile_pos = {player_pos.x, player_pos.y + 1};
 
-void init_enemies_pos(Vector2 *pos_arr, float y) {
-  Vector2 base_pos = {3, y};
-  for (uint8_t i = 0; i < ENEMY_COLS; i++) {
-    pos_arr[i] = Vector2Add(base_pos, {(float)(i * ENEMY_SPACING), 0});
+std::vector<Vector2> enemies_pos;
+
+void init_enemies_pos() {
+  uint8_t offset = ENEMY_SPACING - 1;
+  for (int i = 0; i < 3; i++) {
+    for (int j = 0; j < 5; j++) {
+      float y = i * offset;
+      float x = (j + 3) * ENEMY_SPACING;
+      enemies_pos.push_back({x, y});
+    }
   }
 }
 
@@ -104,19 +110,15 @@ void draw_player() { draw_shape(player_pos, player_shape); }
 void draw_projectile() { draw_shape(projectile_pos, projectile_shape); }
 
 // Terrible code
-void draw_enemies(Vector2 *positions, EnemyType type) {
-  for (uint8_t i = 0; i < ENEMY_COLS; i++) {
-    switch (type) {
-    case ALPHA:
-      draw_shape(positions[i], alpha_enemy_shape);
-      break;
-    case BETA:
-      draw_shape(positions[i], beta_enemy_shape);
-      break;
-    case ZETA:
-      draw_shape(positions[i], zeta_enemy_shape);
-      break;
-    }
+void draw_enemies() {
+  for (uint8_t i = 0; i < 5; i++) {
+    draw_shape(enemies_pos[i], alpha_enemy_shape);
+  }
+  for (uint8_t i = 5; i < 10; i++) {
+    draw_shape(enemies_pos[i], beta_enemy_shape);
+  }
+  for (uint8_t i = 10; i < 15; i++) {
+    draw_shape(enemies_pos[i], zeta_enemy_shape);
   }
 }
 
@@ -145,13 +147,15 @@ Rectangle get_rect_from_projectile(Vector2 pos) {
 void draw_collision_box(Rectangle rect) { DrawRectangleRec(rect, RED); }
 
 void draw_collision_boxes() {
-  Rectangle enemy_rect = get_rect_from_enemy({3, 3});
   Rectangle projectile_rect = get_rect_from_projectile(projectile_pos);
-  draw_collision_box(enemy_rect);
   draw_collision_box(projectile_rect);
+
+  for (uint8_t i = 0; i < 15; i++) {
+    Rectangle enemy_rect = get_rect_from_enemy(enemies_pos[i]);
+    draw_collision_box(enemy_rect);
+  }
 }
 
-// How to handle this shit?
 bool check_enemy_collision(Vector2 enemy_pos, Vector2 projectile_pos) {
   Rectangle enemy_rect = get_rect_from_enemy(enemy_pos);
   Rectangle projectile_rect = get_rect_from_projectile(projectile_pos);
@@ -159,7 +163,9 @@ bool check_enemy_collision(Vector2 enemy_pos, Vector2 projectile_pos) {
   return CheckCollisionRecs(enemy_rect, projectile_rect);
 }
 
-void kill_enemy() {}
+void kill_enemy(uint8_t index) {
+  enemies_pos.erase(enemies_pos.begin() + index);
+}
 
 void reset_projectile(Vector2 player_pos, Vector2 *projectile_pos) {
   projectile_pos->x = player_pos.x;
@@ -178,7 +184,19 @@ void render() {
   draw_projectile();
 
   // Enemies
-  draw_shape({3, 3}, alpha_enemy_shape);
+  draw_enemies();
+}
+
+void handle_enemy_hit() {
+  for (uint8_t i = 0; i < 15; i++) {
+    if (check_enemy_collision(enemies_pos[i], projectile_pos)) {
+      // DEBUG: Enemy - Projectile Collision
+      TraceLog(LOG_INFO, "Enemy Hit");
+
+      kill_enemy(i);
+      reset_projectile(player_pos, &projectile_pos);
+    }
+  }
 }
 
 void update_pos() {
@@ -188,12 +206,7 @@ void update_pos() {
   }
 
   // Collisions
-  if (check_enemy_collision({3, 3}, projectile_pos)) {
-    // DEBUG: Enemy - Projectile Collision
-    TraceLog(LOG_INFO, "Enemy Hit");
-
-    reset_projectile(player_pos, &projectile_pos);
-  }
+  handle_enemy_hit();
 
   // Out of Bounds
   if (projectile_pos.y <= -2) {
@@ -263,6 +276,7 @@ void init_game() {
   SetTargetFPS(FPS);
 
   // Game Setup
+  init_enemies_pos();
 }
 
 void close_game() {}

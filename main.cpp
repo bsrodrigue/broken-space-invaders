@@ -17,7 +17,7 @@
 #define FPS 30
 
 //-------------[Grid]-------------//
-#define CELL_COUNT 60
+#define CELL_COUNT 50
 #define CELL_SIZE WINDOW_WIDTH / CELL_COUNT
 
 #define GET_INGAME_POS(ABS_POS) ABS_POS *CELL_SIZE
@@ -81,7 +81,7 @@ void init_enemies_pos() {
   for (int i = 0; i < 3; i++) {
     for (int j = 0; j < 5; j++) {
       float y = i * offset;
-      float x = (j + 4) * ENEMY_SPACING;
+      float x = (j + 1) * ENEMY_SPACING;
       enemies_pos.push_back({x, y});
     }
   }
@@ -106,6 +106,10 @@ enum EnemyType {
   BETA,
   ZETA,
 };
+
+bool enemy_to_right = true;
+
+uint8_t enemy_mov_count = 0;
 
 void draw_player() { draw_shape(player_pos, player_shape); }
 void draw_projectile() { draw_shape(projectile_pos, projectile_shape); }
@@ -194,10 +198,27 @@ void handle_enemy_hit() {
   }
 }
 
-void handle_enemy_fall() {
-  for (uint8_t i = 0; i < enemies_pos.size(); i++) {
-    enemies_pos[i] = Vector2Add(enemies_pos[i], {0, 1});
+uint8_t enemy_mov_steps = 15;
+
+void handle_enemy_movement() {
+  if (enemy_mov_count >= enemy_mov_steps) {
+    enemy_mov_count = 0;
+    enemy_to_right = !enemy_to_right;
+
+    for (uint8_t i = 0; i < enemies_pos.size(); i++) {
+      enemies_pos[i] = Vector2Add(enemies_pos[i], {0, 1});
+    }
+
+    return;
   }
+
+  Vector2 mov = {0, 0};
+  mov.x = enemy_to_right ? 1 : -1;
+  for (uint8_t i = 0; i < enemies_pos.size(); i++) {
+    enemies_pos[i] = Vector2Add(enemies_pos[i], mov);
+  }
+
+  enemy_mov_count++;
 }
 
 void update_pos() {
@@ -221,14 +242,14 @@ void get_player_input(int pressed_key) {
   case KEY_SPACE:
     player_is_shooting = true;
     break;
-  case KEY_LEFT:
-    player_pos = Vector2Add(player_pos, {-1, 0});
-    break;
-  case KEY_RIGHT:
-    player_pos = Vector2Add(player_pos, {1, 0});
-    break;
   default:
     break;
+  }
+
+  if (IsKeyDown(KEY_LEFT)) {
+    player_pos = Vector2Add(player_pos, {-1, 0});
+  } else if (IsKeyDown(KEY_RIGHT)) {
+    player_pos = Vector2Add(player_pos, {1, 0});
   }
 
   if (!player_is_shooting) {
@@ -240,7 +261,7 @@ double last_update_time = 0;
 double last_enemy_fall = 0;
 
 const double projectile_interval = 0.03;
-const double enemy_fall_interval = 1;
+const double enemy_fall_interval = 0.5;
 
 bool can_update_pos(double *time, const double interval) {
   double current_time = GetTime();
@@ -265,7 +286,7 @@ void game_loop() {
     }
 
     if (can_update_pos(&last_enemy_fall, enemy_fall_interval)) {
-      handle_enemy_fall();
+      handle_enemy_movement();
     }
 
     render();

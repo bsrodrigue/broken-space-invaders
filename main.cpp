@@ -1,5 +1,4 @@
 #include <cstdint>
-#include <cstdio>
 #include <cstdlib>
 #include <raylib.h>
 #include <raymath.h>
@@ -17,14 +16,16 @@
 #define FPS 30
 
 //-------------[Grid]-------------//
-#define CELL_COUNT 50
+#define CELL_COUNT 60
 #define CELL_SIZE WINDOW_WIDTH / CELL_COUNT
 
 #define GET_INGAME_POS(ABS_POS) ABS_POS *CELL_SIZE
 
 //-------------[Entities]-------------//
-#define ENEMY_COLS 5
-#define ENEMY_SPACING 5
+#define ENEMY_H_SPACING 5
+#define ENEMY_V_SPACING (ENEMY_H_SPACING - 1)
+
+#define GUARD_H_SPACING 10
 
 namespace grid {
 void draw_cell(int x, int y, Color color = WHITE) {
@@ -32,16 +33,25 @@ void draw_cell(int x, int y, Color color = WHITE) {
 }
 } // namespace grid
 
+// Player Shape
 uint8_t player_shape[3][3] = {
     {0, 0, 0},
     {0, 1, 0},
     {1, 1, 1},
 };
 
+// Projectile Shape
 uint8_t projectile_shape[3][3] = {
     {0, 0, 0},
     {0, 1, 0},
     {0, 1, 0},
+};
+
+// Guard Shape
+uint8_t guard_shape[3][3] = {
+    {1, 1, 1},
+    {1, 1, 1},
+    {1, 1, 1},
 };
 
 // Enemy Shapes
@@ -64,26 +74,48 @@ uint8_t zeta_enemy_shape[3][3] = {
 };
 
 // Enemy Placement
+// TODO: Find a way to use this
 uint8_t enemy_placement[3][5] = {
     {1, 1, 1, 1, 1},
     {2, 2, 2, 2, 2},
     {3, 3, 3, 3, 3},
 };
 
+class Guard {
+public:
+  uint8_t life = 3;
+  Vector2 pos;
+};
+
 // Initial positions
+// Player Related Positions
 Vector2 player_pos = {(float)CELL_COUNT / 2, CELL_COUNT - 5};
 Vector2 projectile_pos = {player_pos.x, player_pos.y + 1};
 
+// Guard
+std::vector<Guard> guards;
+
+// Enemy Related Positions
 std::vector<Vector2> enemies_pos;
 
+// TODO: Improve this code
 void init_enemies_pos() {
-  uint8_t offset = ENEMY_SPACING - 1;
   for (int i = 0; i < 3; i++) {
     for (int j = 0; j < 5; j++) {
-      float y = i * offset;
-      float x = (j + 1) * ENEMY_SPACING;
+      float y = i * ENEMY_V_SPACING;
+      float x = (j + 1) * ENEMY_H_SPACING;
       enemies_pos.push_back({x, y});
     }
+  }
+}
+
+void init_guards() {
+  for (int i = 0; i < 3; i++) {
+    float y = CELL_COUNT - 10;
+    float x = (i + 1) * GUARD_H_SPACING;
+    Guard guard;
+    guard.pos = {x, y};
+    guards.push_back(guard);
   }
 }
 
@@ -114,11 +146,27 @@ uint8_t enemy_mov_count = 0;
 void draw_player() { draw_shape(player_pos, player_shape); }
 void draw_projectile() { draw_shape(projectile_pos, projectile_shape); }
 
-// Terrible code
 void draw_enemies() {
   for (uint8_t i = 0; i < enemies_pos.size(); i++) {
     draw_shape(enemies_pos[i], alpha_enemy_shape);
   }
+}
+
+void draw_guards() {
+  for (uint8_t i = 0; i < guards.size(); i++) {
+    draw_shape(guards[i].pos, guard_shape);
+  }
+}
+
+Rectangle get_rect_from_guard(Vector2 pos) {
+  Rectangle rect;
+  rect.x = GET_INGAME_POS(pos.x);
+  rect.y = GET_INGAME_POS(pos.y);
+
+  rect.width = ((float)CELL_SIZE * 3);
+  rect.height = rect.width;
+
+  return rect;
 }
 
 Rectangle get_rect_from_enemy(Vector2 pos) {
@@ -153,6 +201,11 @@ void draw_collision_boxes() {
     Rectangle enemy_rect = get_rect_from_enemy(enemies_pos[i]);
     draw_collision_box(enemy_rect);
   }
+
+  for (uint8_t i = 0; i < guards.size(); i++) {
+    Rectangle guard_rect = get_rect_from_guard(guards[i].pos);
+    draw_collision_box(guard_rect);
+  }
 }
 
 bool check_enemy_collision(Vector2 enemy_pos, Vector2 projectile_pos) {
@@ -162,8 +215,26 @@ bool check_enemy_collision(Vector2 enemy_pos, Vector2 projectile_pos) {
   return CheckCollisionRecs(enemy_rect, projectile_rect);
 }
 
+bool check_guard_collision(Vector2 guard_pos, Vector2 projectile_pos) {
+  Rectangle guard_rect = get_rect_from_guard(guard_pos);
+  Rectangle projectile_rect = get_rect_from_projectile(projectile_pos);
+
+  return CheckCollisionRecs(guard_rect, projectile_rect);
+}
+
 void kill_enemy(uint8_t index) {
   enemies_pos.erase(enemies_pos.begin() + index);
+}
+
+void damage_guard(uint8_t index) {
+  Guard *guard = &guards[index];
+  if (guard->life <= 1) {
+    // Kill
+    guards.erase(guards.begin() + index);
+    return;
+  }
+
+  guard->life--;
 }
 
 void reset_projectile(Vector2 player_pos, Vector2 *projectile_pos) {
@@ -176,22 +247,27 @@ void reset_projectile(Vector2 player_pos, Vector2 *projectile_pos) {
 bool check_out_of_bounds(Vector2 pos) { return false; }
 
 void render() {
-  // Player
   draw_player();
-  // DEBUG: Collision Boxes
+
+  draw_guards();
   // draw_collision_boxes();
   draw_projectile();
 
-  // Enemies
   draw_enemies();
+}
+
+void handle_guard_hit() {
+  for (uint8_t i = 0; i < guards.size(); i++) {
+    if (check_guard_collision(guards[i].pos, projectile_pos)) {
+      damage_guard(i);
+      reset_projectile(player_pos, &projectile_pos);
+    }
+  }
 }
 
 void handle_enemy_hit() {
   for (uint8_t i = 0; i < enemies_pos.size(); i++) {
     if (check_enemy_collision(enemies_pos[i], projectile_pos)) {
-      // DEBUG: Enemy - Projectile Collision
-      TraceLog(LOG_INFO, "Enemy %d Hit", i);
-
       kill_enemy(i);
       reset_projectile(player_pos, &projectile_pos);
     }
@@ -229,6 +305,7 @@ void update_pos() {
 
   // Collisions
   handle_enemy_hit();
+  handle_guard_hit();
 
   // Out of Bounds
   if (projectile_pos.y <= -2) {
@@ -237,7 +314,6 @@ void update_pos() {
 }
 
 void get_player_input(int pressed_key) {
-
   switch (pressed_key) {
   case KEY_SPACE:
     player_is_shooting = true;
@@ -278,6 +354,7 @@ void game_loop() {
   while (!WindowShouldClose()) {
     BeginDrawing();
     ClearBackground(BLACK);
+
     int pressed_key = GetKeyPressed();
     get_player_input(pressed_key);
 
@@ -307,6 +384,7 @@ void init_game() {
 
   // Game Setup
   init_enemies_pos();
+  init_guards();
 }
 
 void close_game() {}
@@ -317,6 +395,5 @@ int main(int argc, char *argv[]) {
   game_loop();
 
   close_game();
-
   return EXIT_SUCCESS;
 }
